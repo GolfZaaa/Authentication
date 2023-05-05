@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using AuthenticationNoIdenNoDatabase.Service;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -15,71 +17,65 @@ namespace AuthenticationNoIdenNoDatabase.Controllers
     {
         public static User user = new User();
         private readonly IConfiguration _configuration;
+        private readonly IAuthService _authService;
 
-        public AuthController(IConfiguration configuration)
+
+        public AuthController(IAuthService authService,IConfiguration configuration)
         {
+            _authService = authService;
             _configuration = configuration;
         }
 
-        [HttpPost]
-        public ActionResult Register(UserDto request)
+        [HttpPost("[action]")]
+        public async Task <IActionResult> Register(RegisterDto request)
         {
+            var user = await _authService.RegisterAsync(request);
 
-            string passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+            if (user == null) return BadRequest("UserName has already");
 
-            user.Username = request.Username;
-            user.PasswordHash = passwordHash;
-
-            return Ok(user);
+            return Ok(await _authService.GetUsers());
         }
 
         [HttpPost("[action]")]
-        public ActionResult Login(UserDto request)
+        public async Task <IActionResult> Login(LoginDto request)
         {
-            if (user.Username != request.Username)
-            {
-                return BadRequest("User not found.");
-            }
-
-           if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            {
-                return BadRequest("Password Wrong");
-            }
-
-            string token = CreateToken(user);
+            var token = await _authService.LoginAsync(request);
 
            return Ok(token);
         }
 
 
-        //RoleManager = ["admin","User"]
-        // To generate token
-        private string CreateToken(User user)
-        {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["AppSettings:Token"]));
-            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha512Signature);
-
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.Name,user.Username),
-                new Claim(ClaimTypes.Role,"Admin"),
-                new Claim(ClaimTypes.Role,"User")
-            };
-
-            var token = new JwtSecurityToken(
-                claims : claims,
-                expires: DateTime.Now.AddHours(1),
-                signingCredentials: credentials);
-
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
-
-        }
-
         [HttpGet("[action]"),Authorize(Roles = "Admin")]
         public IActionResult test()
         {
             return Ok("คุณมีสิทธื์การเข้าใช้สู่ระบบ");
+        }
+
+        [HttpGet("[action]"), Authorize]
+        public IActionResult GetTokenDetail()
+        {
+            var user = User.FindFirstValue(ClaimTypes.Name);
+
+            var role = User.FindFirstValue(ClaimTypes.Role);
+
+            return Ok(new { user, role });
+        }
+
+
+        [HttpGet("[action]"), Authorize]
+
+        public async Task <IActionResult> GetToken()
+        {
+            var token = _authService.GetTokenDetail();
+
+            return Ok(token);
+        }
+
+        [HttpGet("[action]"), Authorize]
+        public async Task<IActionResult> GetTokenClaim()
+        {
+            var accessToken = await HttpContext.GetTokenAsync("access_token");
+            return Ok(accessToken);
         }
 
 

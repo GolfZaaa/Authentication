@@ -1,6 +1,6 @@
 ﻿namespace AuthenticationNoIdenNoDatabase.Models
 {
-    public class UserDto
+    public class LoginDto
     {
 
         public required string Username { get; set; }

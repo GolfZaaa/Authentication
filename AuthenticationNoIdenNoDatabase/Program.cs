@@ -1,4 +1,6 @@
 global using AuthenticationNoIdenNoDatabase.Models;
+using AuthenticationNoIdenNoDatabase.Data;
+using AuthenticationNoIdenNoDatabase.Service;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
@@ -11,6 +13,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddDbContext<DataContext>();
+
+builder.Services.AddScoped<IAuthService,AuthService>();
 
 builder.Services.AddSwaggerGen(opt =>
 {
@@ -34,12 +39,16 @@ builder.Services.AddAuthentication()
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            ValidateAudience = false,
-            ValidateIssuer = false,
+            ValidateAudience = true,
+            ValidateIssuer = true,
+            ValidIssuer= builder.Configuration["JWT:Issuer"],
+            ValidAudience= builder.Configuration["JWT:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
                 builder.Configuration.GetSection("AppSettings:Token").Value!))
         };
     });
+
+builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
